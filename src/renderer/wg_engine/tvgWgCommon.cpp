@@ -27,6 +27,99 @@
 #include "tvgWgCommon.h"
 #include "tvgArray.h"
 
+// ****************************************************************************
+// WgStagedBuffer
+// ****************************************************************************
+
+void WgStagedBuffer::initialize(WGPUDevice device, WGPUQueue queue)
+{
+    // store context handles
+    this->device = device;
+    this->queue = queue;
+    // pre allocate staged buffer
+    allocateBufferCpu(WG_STAGED_BUFFER_MIN_SIZE);
+    allocateBufferGpu(WG_STAGED_BUFFER_MIN_SIZE);
+};
+
+
+void WgStagedBuffer::release()
+{
+    // clear allocated records
+    stagedRecords.clear();
+    bufferSize = 0;
+    allocated = 0;
+    // free sys memory buffer
+    free(bufferCpu);
+    bufferCpu = nullptr;
+    // free gpu memory buffer
+    wgpuBufferDestroy(bufferGpu);
+    wgpuBufferRelease(bufferGpu);
+    bufferGpu = nullptr;
+    // clear context handles
+    queue = nullptr;
+    device = nullptr;
+}
+
+
+void WgStagedBuffer::allocateBufferCpu(uint64_t size)
+{
+    if (bufferSize >= size) return;
+    bufferCpu = (uint8_t *)realloc(bufferCpu, size);
+    assert(bufferCpu);
+    bufferSize = size;
+}
+
+
+void WgStagedBuffer::allocateBufferGpu(uint64_t size)
+{
+    if ((bufferGpu) && (size <= wgpuBufferGetSize(bufferGpu))) return;
+    // release gpu memory buffer
+    if (bufferGpu) {
+        wgpuBufferDestroy(bufferGpu);
+        wgpuBufferRelease(bufferGpu);
+        bufferGpu = nullptr;
+    }
+    // allocate gpu memory buffer
+    const WGPUBufferDescriptor bufferDesc { .usage = WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst, .size = size };
+    bufferGpu = wgpuDeviceCreateBuffer(device, &bufferDesc);
+    assert(bufferGpu);
+}
+
+
+void WgStagedBuffer::writeAsync(WGPUBuffer buffer, const void* data, uint64_t size)
+{
+    // reallocate cpu buffer to requested size if necessary
+    allocateBufferCpu(allocated + size);
+    // flush data to cpu memory buffer
+    stagedRecords.push({ buffer, allocated, size });
+    memcpy(bufferCpu + allocated, data, size);
+    allocated += size;
+}
+
+
+void WgStagedBuffer::flush(WGPUCommandEncoder commandEncoder)
+{
+    // reallocate cpu buffer to requested size if necessary
+    allocateBufferGpu(bufferSize);
+    // flush data to gpu memory buffer
+    wgpuQueueWriteBuffer(queue, bufferGpu, 0, bufferCpu, allocated);
+    // copy data to requested gpu memory buffers
+    for (uint32_t i = 0; i < stagedRecords.count; i++) {
+        WGPUBuffer bufferDst = stagedRecords[i].buffer;
+        uint64_t offset = stagedRecords[i].offset;
+        uint64_t size = stagedRecords[i].size;
+        wgpuCommandEncoderCopyBufferToBuffer(commandEncoder, bufferGpu, offset, bufferDst, 0, size);
+    }
+    // reset staged records
+    stagedRecords.clear();
+    allocated = 0;
+}
+
+
+// ****************************************************************************
+// WgContext
+// ****************************************************************************
+
 void WgContext::initialize(WGPUInstance instance, WGPUDevice device)
 {
     assert(instance);
@@ -54,11 +147,14 @@ void WgContext::initialize(WGPUInstance instance, WGPUDevice device)
 
     // initialize bind group layouts
     layouts.initialize(device);
+    // initialize staged buffers
+    stagedBuffer.initialize(device, queue);
 }
 
 
 void WgContext::release()
 {
+    stagedBuffer.release();
     layouts.release();
     releaseSampler(samplerLinearClamp);
     releaseSampler(samplerLinearMirror);
@@ -184,13 +280,15 @@ void WgContext::releaseSampler(WGPUSampler& sampler)
 
 bool WgContext::allocateBufferUniform(WGPUBuffer& buffer, const void* data, uint64_t size)
 {
-    if ((buffer) && (wgpuBufferGetSize(buffer) >= size))
-        wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
-    else {
+    if ((buffer) && (wgpuBufferGetSize(buffer) >= size)) {
+        //wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        stagedBuffer.writeAsync(buffer, data, size);
+    } else {
         releaseBuffer(buffer);
         const WGPUBufferDescriptor bufferDesc { .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, .size = size };
         buffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
-        wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        //wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        stagedBuffer.writeAsync(buffer, data, size);
         return true;
     }
     return false;
@@ -199,16 +297,18 @@ bool WgContext::allocateBufferUniform(WGPUBuffer& buffer, const void* data, uint
 
 bool WgContext::allocateBufferVertex(WGPUBuffer& buffer, const float* data, uint64_t size)
 {
-    if ((buffer) && (wgpuBufferGetSize(buffer) >= size))
-        wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
-    else {
+    if ((buffer) && (wgpuBufferGetSize(buffer) >= size)) {
+        //wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        stagedBuffer.writeAsync(buffer, data, size);
+    } else {
         releaseBuffer(buffer);
         const WGPUBufferDescriptor bufferDesc {
             .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
             .size = size > WG_VERTEX_BUFFER_MIN_SIZE ? size : WG_VERTEX_BUFFER_MIN_SIZE
         };
         buffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
-        wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        //wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        stagedBuffer.writeAsync(buffer, data, size);
         return true;
     }
     return false;
@@ -217,16 +317,18 @@ bool WgContext::allocateBufferVertex(WGPUBuffer& buffer, const float* data, uint
 
 bool WgContext::allocateBufferIndex(WGPUBuffer& buffer, const uint32_t* data, uint64_t size)
 {
-    if ((buffer) && (wgpuBufferGetSize(buffer) >= size))
-        wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
-    else {
+    if ((buffer) && (wgpuBufferGetSize(buffer) >= size)) {
+        //wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        stagedBuffer.writeAsync(buffer, data, size);
+    } else {
         releaseBuffer(buffer);
         const WGPUBufferDescriptor bufferDesc {
             .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index,
             .size = size > WG_INDEX_BUFFER_MIN_SIZE ? size : WG_INDEX_BUFFER_MIN_SIZE
         };
         buffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
-        wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        //wgpuQueueWriteBuffer(queue, buffer, 0, data, size);
+        stagedBuffer.writeAsync(buffer, data, size);
         return true;
     }
     return false;
