@@ -147,6 +147,8 @@ bool WgRenderer::preRender()
     // create command encoder for drawing
     WGPUCommandEncoderDescriptor commandEncoderDesc{};
     mCommandEncoder = wgpuDeviceCreateCommandEncoder(mContext.device, &commandEncoderDesc);
+    // flush allocated data to gpu memory
+    mContext.stagedBuffer.flush(mCommandEncoder);
     // start root render pass
     mCompositor.beginRenderPass(mCommandEncoder, mRenderStorageStack.last(), true);
     return true;

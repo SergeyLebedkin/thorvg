@@ -24,9 +24,39 @@
 #define _TVG_WG_COMMON_H_
 
 #include "tvgWgBindGroups.h"
+#include "tvgArray.h"
 
 #define WG_VERTEX_BUFFER_MIN_SIZE 2048
 #define WG_INDEX_BUFFER_MIN_SIZE 2048
+#define WG_STAGED_BUFFER_MIN_SIZE (1024*1024*2)
+
+struct WgStagedRecord { WGPUBuffer buffer; uint64_t offset; uint64_t size; };
+
+class WgStagedBuffer {
+private:
+    // wgpu context handles
+    WGPUDevice device;
+    WGPUQueue queue;
+    // wgpu context handles
+    WGPUBuffer bufferGpu{};
+    uint8_t* bufferCpu{};
+    uint64_t bufferSize{};
+    uint64_t allocated{};
+    // staged buffer records
+    tvg::Array<WgStagedRecord> stagedRecords;
+
+    // change size of staged buffers (cpu and gpu)
+    void allocateBufferCpu(uint64_t size);
+    void allocateBufferGpu(uint64_t size);
+public:
+    void initialize(WGPUDevice device, WGPUQueue queue);
+    void release();
+
+    // memory operations. flush() must be called after functions calls
+    void writeAsync(WGPUBuffer buffer, const void* data, uint64_t size);
+    // flush data to gpu memory. call before any draw
+    void flush(WGPUCommandEncoder commandEncoder);
+};
 
 struct WgContext {
     // external webgpu handles
@@ -44,6 +74,8 @@ struct WgContext {
     WGPUSampler samplerLinearClamp{};
     // bind groups layouts
     WgBindGroupLayouts layouts;
+    // stageg buffers
+    WgStagedBuffer stagedBuffer;
 
     void initialize(WGPUInstance instance, WGPUDevice device);
     void release();
