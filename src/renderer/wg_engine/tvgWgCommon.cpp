@@ -84,19 +84,19 @@ bool WgContext::allocateTexture(WGPUTexture& texture, uint32_t width, uint32_t h
 {
     if ((texture) && (wgpuTextureGetWidth(texture) == width) && (wgpuTextureGetHeight(texture) == height)) {
         // update texture data
-        const WGPUImageCopyTexture imageCopyTexture{ .texture = texture };
-        const WGPUTextureDataLayout textureDataLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        const WGPUTexelCopyTextureInfo texelCopyTexture{ .texture = texture };
+        const WGPUTexelCopyBufferLayout texelDataLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
         const WGPUExtent3D writeSize{ .width = width, .height = height, .depthOrArrayLayers = 1 };
-        wgpuQueueWriteTexture(queue, &imageCopyTexture, data, 4 * width * height, &textureDataLayout, &writeSize);
+        wgpuQueueWriteTexture(queue, &texelCopyTexture, data, 4 * width * height, &texelDataLayout, &writeSize);
         wgpuQueueSubmit(queue, 0, nullptr);
     } else {
         releaseTexture(texture);
         texture = createTexture(width, height, format);
         // update texture data
-        const WGPUImageCopyTexture imageCopyTexture{ .texture = texture };
-        const WGPUTextureDataLayout textureDataLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        const WGPUTexelCopyTextureInfo texelCopyTexture{ .texture = texture };
+        const WGPUTexelCopyBufferLayout texelDataLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
         const WGPUExtent3D writeSize{ .width = width, .height = height, .depthOrArrayLayers = 1 };
-        wgpuQueueWriteTexture(queue, &imageCopyTexture, data, 4 * width * height, &textureDataLayout, &writeSize);
+        wgpuQueueWriteTexture(queue, &texelCopyTexture, data, 4 * width * height, &texelDataLayout, &writeSize);
         wgpuQueueSubmit(queue, 0, nullptr);
         return true;
     }
