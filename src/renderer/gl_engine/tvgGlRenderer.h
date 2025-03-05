@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2025 the ThorVG project. All rights reserved.
+ * Copyright (c) 2023 - 2025 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,46 +23,12 @@
 #ifndef _TVG_GL_RENDERER_H_
 #define _TVG_GL_RENDERER_H_
 
-#include "tvgArray.h"
-#include "tvgGlRenderTarget.h"
 #include "tvgGlRenderTask.h"
-#include "tvgGlGpuBuffer.h"
-#include "tvgGlRenderPass.h"
+#include "tvgRender.h"
 
 class GlRenderer : public RenderMethod
 {
 public:
-    enum RenderTypes
-    {
-        RT_Color = 0,
-        RT_LinGradient,
-        RT_RadGradient,
-        RT_Image,
-        RT_MaskAlpha,
-        RT_MaskAlphaInv,
-        RT_MaskLuma,
-        RT_MaskLumaInv,
-        RT_MaskAdd,
-        RT_MaskSub,
-        RT_MaskIntersect,
-        RT_MaskDifference,
-        RT_MaskLighten,
-        RT_MaskDarken,
-        RT_Stencil,
-        RT_Blit,
-        RT_MultiplyBlend,
-        RT_ScreenBlend,
-        RT_OverlayBlend,
-        RT_ColorDodgeBlend,
-        RT_ColorBurnBlend,
-        RT_HardLightBlend,
-        RT_SoftLightBlend,
-        RT_DifferenceBlend,
-        RT_ExclusionBlend,
-
-        RT_None,
-    };
-
     bool preUpdate() override;
     RenderData prepare(const RenderShape& rshape, RenderData data, const Matrix& transform, Array<RenderData>& clips, uint8_t opacity, RenderUpdateFlag flags, bool clipper) override;
     RenderData prepare(RenderSurface* surface, RenderData data, const Matrix& transform, Array<RenderData>& clips, uint8_t opacity, RenderUpdateFlag flags) override;
@@ -71,7 +37,7 @@ public:
     bool renderShape(RenderData data) override;
     bool renderImage(RenderData data) override;
     bool postRender() override;
-    void dispose(RenderData data) override;;
+    void dispose(RenderData data) override;
     RenderRegion region(RenderData data) override;
     RenderRegion viewport() override;
     bool viewport(const RenderRegion& vp) override;
@@ -80,8 +46,8 @@ public:
     const RenderSurface* mainSurface() override;
 
     bool target(void* context, int32_t id, uint32_t w, uint32_t h);
-    bool sync() override;
     bool clear() override;
+    bool sync() override;
 
     RenderCompositor* target(const RenderRegion& region, ColorSpace cs, CompositionFlag flags) override;
     bool beginComposite(RenderCompositor* cmp, MaskMethod method, uint8_t opacity) override;
@@ -90,56 +56,51 @@ public:
     void prepare(RenderEffect* effect, const Matrix& transform) override;
     bool region(RenderEffect* effect) override;
     bool render(RenderCompositor* cmp, const RenderEffect* effect, bool direct) override;
-    void dispose(TVG_UNUSED RenderEffect* effect) override;
+    void dispose(RenderEffect* effect) override;
 
     static GlRenderer* gen();
-    static bool init(TVG_UNUSED uint32_t threads);
+    static bool init(uint32_t threads);
     static int32_t init();
     static bool term();
 
 private:
-    GlRenderer(); 
+    GlRenderer();
     ~GlRenderer();
+    void release();
+    void disposeObjects();
 
-    void initShaders();
-    void drawPrimitive(GlShape& sdata, const RenderColor& c, RenderUpdateFlag flag, int32_t depth);
-    void drawPrimitive(GlShape& sdata, const Fill* fill, RenderUpdateFlag flag, int32_t depth);
-    void drawClip(Array<RenderData>& clips);
+    // render tree stacks
+    GlRenderTarget mRenderTargetRoot;
+    Array<GlCompose*> mCompositorList;
+    Array<GlRenderTarget*> mRenderTargetStack;
+    Array<GlSceneTask*> mSceneTaskStack;
+    Array<GlRenderTask*> mRenderTaskList;
 
-    GlRenderPass* currentPass();
+    // render target pool
+    GlRenderTargetPool mRenderTargetPool;
 
-    bool beginComplexBlending(const RenderRegion& vp, RenderRegion bounds);
-    void endBlendingCompose(GlRenderTask* stencilTask, const Matrix& matrix);
-    GlProgram* getBlendProgram();
+    // render data paint pools
+    GlRenderDataStagedBuffer mRenderDataStagedBuffer;
+    GlRenderDataShapePool mRenderDataShapePool;
+    GlRenderDataPicturePool mRenderDataPicturePool;
 
-    void prepareBlitTask(GlBlitTask* task);
-    void prepareCmpTask(GlRenderTask* task, const RenderRegion& vp, uint32_t cmpWidth, uint32_t cmpHeight);
-    void endRenderPass(RenderCompositor* cmp);
+    // rendering context
+    GlContext mContext;
+    GlCompositor mCompositor;
 
-    void flush();
-    void clearDisposes();
-    void currentContext();
+    // rendering states
+    RenderSurface mTargetSurface;
+    BlendMethod mBlendMethod{};
+    RenderRegion mViewport{};
 
-    void* mContext = nullptr;
-    RenderSurface surface;
-    GLint mTargetFboId = 0;
-    RenderRegion mViewport;
-    GlStageBuffer mGpuBuffer;
-    GlRenderTarget mRootTarget;
-    Array<GlProgram*> mPrograms;
-    Array<GlRenderTargetPool*> mComposePool;
-    Array<GlRenderTargetPool*> mBlendPool;
-    Array<GlRenderPass*> mRenderPassStack;
-    Array<GlCompositor*> mComposeStack;
+    // disposable data list
+    Array<RenderData> mDisposeRenderDatas{};
+    Key mDisposeKey{};
 
-    //Disposed resources. They should be released on synced call.
     struct {
-        Array<GLuint> textures;
-        Key key;
-    } mDisposed;
-
-    BlendMethod mBlendMethod = BlendMethod::Normal;
-    bool mClearBuffer = true;  //FIXME: clear buffer should be optional (default is false)
+        GlGeometryBufferPool* pool;   //private buffer pool
+        bool individual = false;      //buffer-pool sharing policy
+    } mBufferPool;
 };
 
 #endif /* _TVG_GL_RENDERER_H_ */

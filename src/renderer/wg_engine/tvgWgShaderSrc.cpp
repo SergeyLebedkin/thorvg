@@ -700,7 +700,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(uTextureSrc, uSamplerSrc, in.texCoord.xy);
+    //return textureSample(uTextureSrc, uSamplerSrc, in.texCoord.xy);
+    return vec4f(in.texCoord.xy, 0.0, 1.0);
 };
 )";
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2025 the ThorVG project. All rights reserved.
+ * Copyright (c) 2023 - 2025 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,8 @@
 #ifndef _TVG_GL_COMMON_H_
 #define _TVG_GL_COMMON_H_
 
-#include <assert.h>
+#include <cassert>
+#include <tvgCommon.h>
 
 #if defined (THORVG_GL_TARGET_GLES)
     #include <GLES3/gl3.h>
@@ -39,165 +40,37 @@
     #define TVG_REQUIRE_GL_MAJOR_VER 3
     #define TVG_REQUIRE_GL_MINOR_VER 3
 #endif
-#include "tvgCommon.h"
-#include "tvgRender.h"
-#include "tvgMath.h"
 
 #ifdef __EMSCRIPTEN__
     #include <emscripten/html5_webgl.h>
     // query GL Error on WebGL is very slow, so disable it on WebGL
     #define GL_CHECK(x) x
 #else
-    #define GL_CHECK(x) \
-        x; \
-        do { \
-          GLenum glError = glGetError(); \
-          if(glError != GL_NO_ERROR) { \
-            TVGERR("GL_ENGINE", "glGetError() = %i (0x%.8x)", glError, glError); \
-            assert(0); \
-          } \
-        } while(0)
+    #define GL_CHECK(stmt) stmt; assert(glGetError() == GL_NO_ERROR);
 #endif
 
-#define MIN_GL_STROKE_WIDTH 1.0f
+struct GlContext {
+    GLenum preferredFormat{};
+    // shared opengl assets
+    GLuint samplerNearestRepeat{};
+    GLuint samplerLinearRepeat{};
+    GLuint samplerLinearMirror{};
+    GLuint samplerLinearClamp{};
 
-#define MVP_MATRIX(w, h) \
-    float mvp[4*4] = { \
-        2.f / w, 0.0, 0.0f, 0.0f, \
-        0.0, -2.f / h, 0.0f, 0.0f, \
-        0.0f, 0.0f, -1.f, 0.0f, \
-        -1.f, 1.f, 0.0f, 1.0f \
-    };
+    void initialize();
+    void release();
 
-#define MULTIPLY_MATRIX(A, B, transform) \
-    for(auto i = 0; i < 4; ++i) \
-    { \
-        for(auto j = 0; j < 4; ++j) \
-        { \
-            float sum = 0.0; \
-            for (auto k = 0; k < 4; ++k) \
-                sum += A[k*4+i] * B[j*4+k]; \
-            transform[j*4+i] = sum; \
-        } \
-    }
+    GLuint createSampler(GLint filter, GLint wrapMode);
+    GLuint createBuffer();
 
-/**
- *  mat3x3               mat4x4
- *
- * [ e11 e12 e13 ]     [ e11 e12 0 e13 ]
- * [ e21 e22 e23 ] =>  [ e21 e22 0 e23 ]
- * [ e31 e32 e33 ]     [ 0   0   1  0  ]
- *                     [ e31 e32 0 e33 ]
- *
- */
+    bool allocateTexture(GLuint& texture, GLsizei width, GLsizei height, GLint format, void* data);
+    bool allocateBufferVertex(GLuint& buffer, const float* data, uint64_t size);
+    bool allocateBufferIndex(GLuint& buffer, const uint32_t* data, uint64_t size);
 
-// All GPU use 4x4 matrix with column major order
-#define GET_MATRIX44(mat3, mat4)    \
-    do {                            \
-        mat4[0] = mat3.e11;         \
-        mat4[1] = mat3.e21;         \
-        mat4[2] = 0;                \
-        mat4[3] = mat3.e31;         \
-        mat4[4] = mat3.e12;         \
-        mat4[5] = mat3.e22;         \
-        mat4[6] = 0;                \
-        mat4[7] = mat3.e32;         \
-        mat4[8] = 0;                \
-        mat4[9] = 0;                \
-        mat4[10] = 1;               \
-        mat4[11] = 0;               \
-        mat4[12] = mat3.e13;        \
-        mat4[13] = mat3.e23;        \
-        mat4[14] = 0;               \
-        mat4[15] = mat3.e33;        \
-    } while (false)
-
-
-
-static inline float getScaleFactor(const Matrix& m)
-{
-    return sqrtf(m.e11 * m.e11 + m.e21 * m.e21);
-}
-
-enum class GlStencilMode {
-    None,
-    FillNonZero,
-    FillEvenOdd,
-    Stroke,
+    void releaseTexture(GLuint& texture);
+    void releaseSampler(GLuint& sampler);
+    void releaseBuffer(GLuint& buffer);
+    void releaseVertexArray(GLuint& vertexArray);
 };
 
-
-class GlStageBuffer;
-class GlRenderTask;
-
-struct GlGeometryBuffer {
-    Array<float> vertex;
-    Array<uint32_t> index;
-
-    void clear()
-    {
-        vertex.clear();
-        index.clear();
-    }
-
-};
-
-struct GlGeometry
-{
-    bool tesselate(const RenderShape& rshape, RenderUpdateFlag flag);
-    bool tesselate(const RenderSurface* image, RenderUpdateFlag flag);
-    void disableVertex(uint32_t location);
-    bool draw(GlRenderTask* task, GlStageBuffer* gpuBuffer, RenderUpdateFlag flag);
-    GlStencilMode getStencilMode(RenderUpdateFlag flag);
-    RenderRegion getBounds() const;
-
-    GlGeometryBuffer fill, stroke;
-    Matrix matrix = {};
-    RenderRegion viewport = {};
-    RenderRegion bounds = {};
-    FillRule fillRule = FillRule::NonZero;
-};
-
-
-struct GlShape
-{
-  const RenderShape* rshape = nullptr;
-  float viewWd;
-  float viewHt;
-  uint32_t opacity = 0;
-  GLuint texId = 0;
-  uint32_t texFlipY = 0;
-  ColorSpace texColorSpace = ColorSpace::ABGR8888;
-  RenderUpdateFlag updateFlag = None;
-  GlGeometry geometry;
-  Array<RenderData> clips;
-};
-
-#define MAX_GRADIENT_STOPS 16
-
-struct GlLinearGradientBlock
-{
-    alignas(16) float nStops[4] = {};
-    alignas(16) float startPos[2] = {};
-    alignas(8) float stopPos[2] = {};
-    alignas(8) float stopPoints[MAX_GRADIENT_STOPS] = {};
-    alignas(16) float stopColors[4 * MAX_GRADIENT_STOPS] = {};
-};
-
-struct GlRadialGradientBlock
-{
-    alignas(16) float nStops[4] = {};
-    alignas(16) float centerPos[4] = {};
-    alignas(16) float radius[2] = {};
-    alignas(16) float stopPoints[MAX_GRADIENT_STOPS] = {};
-    alignas(16) float stopColors[4 * MAX_GRADIENT_STOPS] = {};
-};
-
-struct GlCompositor : RenderCompositor
-{
-    RenderRegion bbox = {};
-
-    GlCompositor(const RenderRegion& box) : bbox(box) {}
-};
-
-#endif /* _TVG_GL_COMMON_H_ */
+#endif // _TVG_GL_COMMON_H_

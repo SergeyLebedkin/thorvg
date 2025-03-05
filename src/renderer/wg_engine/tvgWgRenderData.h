@@ -23,27 +23,25 @@
 #ifndef _TVG_WG_RENDER_DATA_H_
 #define _TVG_WG_RENDER_DATA_H_
 
-#include "tvgWgPipelines.h"
+#include "tvgWgCommon.h"
 #include "tvgWgGeometry.h"
 #include "tvgWgShaderTypes.h"
 
 struct WgMeshData {
-    WGPUBuffer bufferPosition{};
-    WGPUBuffer bufferTexCoord{};
-    WGPUBuffer bufferIndex{};
-    size_t vertexCount{};
-    size_t indexCount{};
-
-    void draw(WgContext& context, WGPURenderPassEncoder renderPassEncoder);
-    void drawFan(WgContext& context, WGPURenderPassEncoder renderPassEncoder);
-    void drawImage(WgContext& context, WGPURenderPassEncoder renderPassEncoder);
+    Array<Point> vbuffer;
+    Array<Point> tbuffer;
+    Array<uint32_t> ibuffer;
+    size_t voffset{};
+    size_t toffset{};
+    size_t ioffset{};
 
     void update(WgContext& context, const WgVertexBuffer& vertexBuffer);
     void update(WgContext& context, const WgIndexedVertexBuffer& vertexBufferInd);
     void bbox(WgContext& context, const Point pmin, const Point pmax);
     void imageBox(WgContext& context, float w, float h);
     void blitBox(WgContext& context);
-    void release(WgContext& context);
+    void appendIndexFan(uint32_t vertexCount);
+    void release(WgContext& context) {};
 };
 
 class WgMeshDataPool {
@@ -119,9 +117,9 @@ struct WgRenderDataShape: public WgRenderDataPaint
     WgRenderSettings renderSettingsStroke{};
     WgMeshDataGroup meshGroupShapes{};
     WgMeshDataGroup meshGroupShapesBBox{};
-    WgMeshData meshDataBBox{};
     WgMeshDataGroup meshGroupStrokes{};
     WgMeshDataGroup meshGroupStrokesBBox{};
+    WgMeshData meshDataBBox{};
     Point pMin{};
     Point pMax{};
     bool strokeFirst{};
@@ -169,59 +167,22 @@ public:
     void release(WgContext& context);
 };
 
-struct WgRenderDataViewport
-{
-    WGPUBindGroup bindGroupViewport{};
-    WGPUBuffer bufferViewport{};
-
-    void update(WgContext& context, const RenderRegion& region);
-    void release(WgContext& context);
-};
-
-class WgRenderDataViewportPool {
+class WgRenderDataStagedBuffer {
 private:
-    // pool contains all created but unused render data for viewport
-    Array<WgRenderDataViewport*> mPool;
-    // list contains all created render data for viewport
-    // to ensure that all created instances will be released
-    Array<WgRenderDataViewport*> mList;
+    WGPUBuffer vbuffer_gpu{};
+    WGPUBuffer ibuffer_gpu{};
+    Array<uint8_t> vbuffer;
+    Array<uint8_t> ibuffer;
 public:
-    WgRenderDataViewport* allocate(WgContext& context);
-    void free(WgContext& context, WgRenderDataViewport* renderData);
+    void append(WgMeshData* meshData);
+    void append(WgMeshDataGroup* meshDataGroup);
+    void append(WgRenderDataShape* renderDataShape);
+    void append(WgRenderDataPicture* renderDataPicture);
+    void initialize(WgContext& context){};
     void release(WgContext& context);
-};
-
-// gaussian blur, drop shadow, fill, tint, tritone
-#define WG_GAUSSIAN_MAX_LEVEL 3
-struct WgRenderDataEffectParams
-{
-    WGPUBindGroup bindGroupParams{};
-    WGPUBuffer bufferParams{};
-    uint32_t extend{};
-    uint32_t level{};
-    Point offset{};
-
-    void update(WgContext& context, const WgShaderTypeEffectParams& effectParams);
-    void update(WgContext& context, const RenderEffectGaussianBlur* gaussian, const Matrix& transform);
-    void update(WgContext& context, const RenderEffectDropShadow* dropShadow, const Matrix& transform);
-    void update(WgContext& context, const RenderEffectFill* fill);
-    void update(WgContext& context, const RenderEffectTint* tint);
-    void update(WgContext& context, const RenderEffectTritone* tritone);
-    void release(WgContext& context);
-};
-
-// effect params pool
-class WgRenderDataEffectParamsPool {
-private:
-    // pool contains all created but unused render data for params
-    Array<WgRenderDataEffectParams*> mPool;
-    // list contains all created render data for params
-    // to ensure that all created instances will be released
-    Array<WgRenderDataEffectParams*> mList;
-public:
-    WgRenderDataEffectParams* allocate(WgContext& context);
-    void free(WgContext& context, WgRenderDataEffectParams* renderData);
-    void release(WgContext& context);
+    void clear();
+    void flush(WgContext& context);
+    void bind(WGPURenderPassEncoder renderPass, size_t voffset, size_t toffset);
 };
 
 #endif // _TVG_WG_RENDER_DATA_H_

@@ -22,111 +22,107 @@
 
 #include "tvgGlRenderTarget.h"
 
-GlRenderTarget::GlRenderTarget(uint32_t width, uint32_t height): mWidth(width), mHeight(height) {}
-
-GlRenderTarget::~GlRenderTarget()
+void GlRenderTarget::initialize(GlContext& context, uint32_t width, uint32_t height)
 {
-    if (mFbo == 0) return;
-    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-    GL_CHECK(glDeleteFramebuffers(1, &mFbo));
+    this->width = width;
+    this->height = height;
+    this->sampler = context.samplerNearestRepeat;
 
-    if (mColorTex != 0) {
-        GL_CHECK(glDeleteTextures(1, &mColorTex));
-    }
-    if (mDepthStencilBuffer != 0) {
-        GL_CHECK(glDeleteRenderbuffers(1, &mDepthStencilBuffer));
-    }
-}
-
-void GlRenderTarget::init(GLint resolveId)
-{
-    if (mFbo != 0 || mWidth == 0 || mHeight == 0) return;
-
-    GL_CHECK(glGenFramebuffers(1, &mFbo));
-
-    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, mFbo));
-
-    GL_CHECK(glGenRenderbuffers(1, &mColorBuffer));
-    GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, mColorBuffer));
-    GL_CHECK(glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_RGBA8, mWidth, mHeight));
-
-    GL_CHECK(glGenRenderbuffers(1, &mDepthStencilBuffer));
-
-    GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, mDepthStencilBuffer));
-
-    GL_CHECK(glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, mWidth, mHeight));
-
+    // multisampled color buffer
+    GL_CHECK(glGenRenderbuffers(1, &bufferColorMS));
+    GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, bufferColorMS));
+    GL_CHECK(glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_RGBA, width, height));
     GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, 0));
+    // multisampled depth-stencil
+    GL_CHECK(glGenRenderbuffers(1, &bufferDepthStencilMS));
+    GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, bufferDepthStencilMS));
+    GL_CHECK(glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, width, height));
+    GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, 0));
+    // multisampled frame buffer
+    GL_CHECK(glGenFramebuffers(1, &frameBufferMS));
+    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, frameBufferMS));
+    GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, bufferColorMS));
+    GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, bufferDepthStencilMS));
+    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 
-    GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, mColorBuffer));
-    GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mDepthStencilBuffer));
-
-    // resolve target
-    GL_CHECK(glGenTextures(1, &mColorTex));
-
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, mColorTex));
-    GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr));
-
+    // resolved texure
+    GL_CHECK(glGenTextures(1, &texture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture));
+    GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
-
-    GL_CHECK(glGenFramebuffers(1, &mResolveFbo));
-    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, mResolveFbo));
-    GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mColorTex, 0));
-
-    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, resolveId));
+    // resolved frame buffer
+    GL_CHECK(glGenFramebuffers(1, &frameBuffer));
+    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer));
+    GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0));
+    GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
-GlRenderTargetPool::GlRenderTargetPool(uint32_t maxWidth, uint32_t maxHeight): mMaxWidth(maxWidth), mMaxHeight(maxHeight), mPool() {}
 
-GlRenderTargetPool::~GlRenderTargetPool()
+void GlRenderTarget::release(GlContext& context)
 {
-    for (uint32_t i = 0; i < mPool.count; i++) {
-        delete mPool[i];
-    }
+    GL_CHECK(glDeleteTextures(1, &texture));
+    GL_CHECK(glDeleteRenderbuffers(1, &bufferColorMS));
+    GL_CHECK(glDeleteRenderbuffers(1, &bufferDepthStencilMS));
+    GL_CHECK(glDeleteFramebuffers(1, &frameBuffer));
+    GL_CHECK(glDeleteFramebuffers(1, &frameBufferMS));
+    height = 0;
+    width = 0;
 }
 
-uint32_t alignPow2(uint32_t value)
+
+void GlRenderTarget::resolve(GlContext& context)
 {
-    uint32_t ret = 1;
-    while (ret < value) {
-        ret <<= 1;
-    }
-    return ret;
+    GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, frameBufferMS));
+    GL_CHECK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer));
+    GL_CHECK(glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST));
+    GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, 0));
+    GL_CHECK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0));
 }
 
-GlRenderTarget* GlRenderTargetPool::getRenderTarget(const RenderRegion& vp, GLuint resolveId)
+//*****************************************************************************
+// render target pool
+//*****************************************************************************
+
+GlRenderTarget* GlRenderTargetPool::allocate(GlContext& context)
 {
-    uint32_t width = static_cast<uint32_t>(vp.w);
-    uint32_t height = static_cast<uint32_t>(vp.h);
-
-    // pow2 align width and height
-    if (width >= mMaxWidth) width = mMaxWidth;
-    else width = alignPow2(width);
-
-    if (width >= mMaxWidth) width = mMaxWidth;
-
-    if (height >= mMaxHeight) height = mMaxHeight;
-    else height = alignPow2(height);
-
-    if (height >= mMaxHeight) height = mMaxHeight;
-
-    for (uint32_t i = 0; i < mPool.count; i++) {
-        auto rt = mPool[i];
-
-        if (rt->getWidth() == width && rt->getHeight() == height) {
-            rt->setViewport(vp);
-            return rt;
-        }
+   GlRenderTarget* renderTarget{};
+    if (pool.count > 0) {
+       renderTarget = pool.last();
+        pool.pop();
+    } else {
+       renderTarget = new GlRenderTarget;
+       renderTarget->initialize(context, width, height);
+       list.push(renderTarget);
     }
-
-    auto rt = new GlRenderTarget(width, height);
-    rt->init(resolveId);
-    rt->setViewport(vp);
-    mPool.push(rt);
-    return rt;
+    return renderTarget;
+};
+ 
+ 
+void GlRenderTargetPool::free(GlContext& context, GlRenderTarget* renderTarget)
+{
+    pool.push(renderTarget);
+};
+ 
+ 
+void GlRenderTargetPool::initialize(GlContext& context, uint32_t width, uint32_t height)
+{
+    this->width = width;
+    this->height = height;
 }
+
+void GlRenderTargetPool::release(GlContext& context)
+{
+    ARRAY_FOREACH(p, list) {
+       (*p)->release(context);
+       delete(*p);
+    }
+    list.clear();
+    pool.clear();
+    height = 0;
+    width = 0;
+};
+ 

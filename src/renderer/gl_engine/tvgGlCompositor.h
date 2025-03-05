@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 the ThorVG project. All rights reserved.
+ * Copyright (c) 2024 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,38 +20,43 @@
  * SOFTWARE.
  */
 
-#ifndef _TVG_WG_RENDER_TARGET_H_
-#define _TVG_WG_RENDER_TARGET_H_
+#ifndef _TVG_GL_COMPOSITOR_H_
+#define _TVG_GL_COMPOSITOR_H_
 
-#include "tvgWgCommon.h"
-#include "tvgArray.h"
+#include "tvgGlRenderTarget.h"
+#include "tvgGlRenderData.h"
+#include "tvgGlShaders.h"
 
-struct WgRenderTarget {
-    WGPUTexture texture{};
-    WGPUTexture textureMS{};
-    WGPUTextureView texView{};
-    WGPUTextureView texViewMS{};
-    WGPUBindGroup bindGroupRead{};
-    WGPUBindGroup bindGroupWrite{};
-    WGPUBindGroup bindGroupTexure{};
-    uint32_t width{};
-    uint32_t height{};
-
-    void initialize(WgContext& context, uint32_t width, uint32_t height);
-    void release(WgContext& context);
+struct GlCompose: RenderCompositor
+{
+    BlendMethod blend{};
+    RenderRegion aabb{};
 };
 
-class WgRenderTargetPool {
+class GlCompositor 
+{
 private:
-    Array<WgRenderTarget*> list;
-    Array<WgRenderTarget*> pool;
+    // shaders
+    GlShaders shaders{};
+    // composition and blend geometries
+    GlMeshData meshData;
+    // render target dimensions
     uint32_t width{};
     uint32_t height{};
+    // current render pass handles
+    GlRenderDataStagedBuffer* stagedBuffer{};
+    GLuint frameBufferHandle{};
+    GlRenderTarget* currentRenderTraget{}; // external handle
 public:
-    WgRenderTarget* allocate(WgContext& context);
-    void free(WgContext& context, WgRenderTarget* renderTarget);
+    void initialize(GlContext& context, GlRenderDataStagedBuffer& stagedBuffer, uint32_t width, uint32_t height);
+    void release(GlContext& context);
+    void update(GlRenderDataStagedBuffer& stagedBuffer);
 
-    void initialize(WgContext& context, uint32_t width, uint32_t height);
-    void release(WgContext& context);
+    void beginRenderPass(GlRenderTarget* target, bool clear, const RenderColor clearColor);
+    void endRenderPass();
+
+    // blit render storage to screen
+    void blit(GlRenderTarget* src, GLuint dstFramebuffer);
 };
-#endif // _TVG_WG_RENDER_TARGET_H_
+
+#endif // _TVG_GL_COMPOSITOR_H_
