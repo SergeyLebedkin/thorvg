@@ -20,13 +20,13 @@
  * SOFTWARE.
  */
 
-#include "tvgGlRenderTask.h"
+#include "tvgWgRenderTask.h"
 
 //***********************************************************************
-// GlPaintTask
+// WgPaintTask
 //***********************************************************************
 
-void GlPaintTask::execute(GlContext& context, GlCompositor& compositor)
+void WgPaintTask::execute(WgContext& context, WgCompositor& compositor, WGPUCommandEncoder encoder)
 {
     // if (renderData->type() == tvg::Type::Shape)
     //     std::cout << "Shape: " << (uint32_t)blendMethod << std::endl;
@@ -39,19 +39,18 @@ void GlPaintTask::execute(GlContext& context, GlCompositor& compositor)
 // GlSceneTask
 //***********************************************************************
 
-void GlSceneTask::execute(GlContext& context, GlCompositor& compositor)
+void WgSceneTask::execute(WgContext& context, WgCompositor& compositor, WGPUCommandEncoder encoder)
 {
     //std::cout << "Scene => " << "childs: " << (uint32_t)childs.count << std::endl;
     ARRAY_FOREACH(task, childs) {
-        GlRenderTask* renderTask = *task;
+        WgRenderTask* renderTask = *task;
         // we can do not start new render pass in a case, if the child have its own
         if (!renderTask->isRenderTarget())
-            compositor.beginRenderPass(renderTarget, false, {0, 0, 0, 0});
+            compositor.beginRenderPass(encoder, renderTarget, false, {0, 0, 0, 0});
         // execute child (shape or scene)
-        renderTask->execute(context, compositor);
+        renderTask->execute(context, compositor, encoder);
     }
     // we must finish current render target for current scene
-    renderTarget->resolve(context);
     compositor.endRenderPass();
     //std::cout << "Scene <= " << std::endl;
 }

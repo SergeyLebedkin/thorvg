@@ -23,6 +23,7 @@
 #ifndef _TVG_WG_COMMON_H_
 #define _TVG_WG_COMMON_H_
 
+#include <cassert>
 #include "tvgWgBindGroups.h"
 
 #define WG_VERTEX_BUFFER_MIN_SIZE 2048
@@ -70,6 +71,11 @@ struct WgContext {
 
     // release buffer objects
     void releaseBuffer(WGPUBuffer& buffer);
+
+    // command encoder
+    WGPUCommandEncoder createCommandEncoder();
+    void submitCommandEncoder(WGPUCommandEncoder encoder);
+    void releaseCommandEncoder(WGPUCommandEncoder& encoder);
 };
 
 #endif // _TVG_WG_COMMON_H_

@@ -20,53 +20,53 @@
  * SOFTWARE.
  */
 
- #ifndef _TVG_GL_RENDER_TASK_H_
- #define _TVG_GL_RENDER_TASK_H_
+ #ifndef _TVG_WG_RENDER_TASK_H_
+ #define _TVG_WG_RENDER_TASK_H_
  
- #include "tvgGlCompositor.h"
+ #include "tvgWgCompositor.h"
 
 // base class for any renderable objects 
-struct GlRenderTask {
-    virtual ~GlRenderTask() {}
+struct WgRenderTask {
+    virtual ~WgRenderTask() {}
     // return true, if task have it own render target
     virtual bool isRenderTarget() { return false; };
     // render tree recurtion depth
-    virtual void execute(GlContext& context, GlCompositor& compositor) = 0;
+    virtual void execute(WgContext& context, WgCompositor& compositor, WGPUCommandEncoder encoder) = 0;
 };
 
-// task for single shape rendering
-struct GlPaintTask: public GlRenderTask {
+// task for sinWge shape rendering
+struct WgPaintTask: public WgRenderTask {
     // shape render properties
-    GlRenderDataPaint* renderData{};
+    WgRenderDataPaint* renderData{};
     BlendMethod blendMethod{};
 
-    GlPaintTask(GlRenderDataPaint* renderData, BlendMethod blendMethod) : 
+    WgPaintTask(WgRenderDataPaint* renderData, BlendMethod blendMethod) : 
         renderData(renderData), blendMethod(blendMethod) {}
     // return true, if task have it own render target
     bool isRenderTarget() override { return false; };
     // apply shape execution, including custom blending and clipping
-    void execute(GlContext& context, GlCompositor& compositor) override;
+    void execute(WgContext& context, WgCompositor& compositor, WGPUCommandEncoder encoder) override;
 };
 
 // task for scene rendering with blending, composition and effect
-struct GlSceneTask: public GlRenderTask {
+struct WgSceneTask: public WgRenderTask {
     // parent scene (nullptr for root scene)
-    GlSceneTask* parent{};
+    WgSceneTask* parent{};
     // childs can be shapes or scenes tesks
-    Array<GlRenderTask*> childs;
+    Array<WgRenderTask*> childs;
     // scene blend/compose targets
-    GlRenderTarget* renderTarget{};
-    GlRenderTarget* renderTargetMsk{};
+    WgRenderTarget* renderTarget{};
+    WgRenderTarget* renderTargetMsk{};
     // scene blend/compose properties
-    GlCompose* compose{};
+    WgCompose* compose{};
 
-    GlSceneTask(GlRenderTarget* renderTarget, GlCompose* compose, GlSceneTask* parent) :
+    WgSceneTask(WgRenderTarget* renderTarget, WgCompose* compose, WgSceneTask* parent) :
         parent(parent), renderTarget(renderTarget), compose(compose) {}
     // return true, if task have it own render target
     bool isRenderTarget() override { return true; };
     // apply scene execution, including all shapes drawing, blending, composition and effect
-    void execute(GlContext& context, GlCompositor& compositor) override;
+    void execute(WgContext& context, WgCompositor& compositor, WGPUCommandEncoder encoder) override;
 };
  
- #endif // _TVG_GL_RENDER_TASK_H_
+ #endif // _TVG_WG_RENDER_TASK_H_
  

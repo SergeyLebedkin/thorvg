@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 the ThorVG project. All rights reserved.
+ * Copyright (c) 2024 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,52 +20,43 @@
  * SOFTWARE.
  */
 
-#ifndef _TVG_GL_RENDER_RENDER_TARGET_H_
-#define _TVG_GL_RENDER_RENDER_TARGET_H_
+#ifndef _TVG_GL_RENDER_TARGET_H_
+#define _TVG_GL_RENDER_TARGET_H_
 
 #include "tvgGlCommon.h"
+#include "tvgArray.h"
 
-class GlRenderTarget
-{
-public:
-    GlRenderTarget() = default;
-    GlRenderTarget(uint32_t width, uint32_t height);
-    ~GlRenderTarget();
+struct GlRenderTarget {
+    // blit sampler
+    GLuint sampler;
+    // resolved handles
+    GLuint frameBuffer{};
+    GLuint texture{};
+    // multisample handles
+    GLuint frameBufferMS{};
+    GLuint bufferColorMS{};
+    GLuint bufferDepthStencilMS{};
+    uint32_t width{};
+    uint32_t height{};
 
-    void init(GLint resolveId);
-
-    GLuint getFboId() { return mFbo; }
-    GLuint getResolveFboId() { return mResolveFbo; }
-    GLuint getColorTexture() { return mColorTex; }
-
-    uint32_t getWidth() const { return mWidth; }
-    uint32_t getHeight() const { return mHeight; }
-
-    void setViewport(const RenderRegion& vp) { mViewport = vp; }
-    const RenderRegion& getViewport() const { return mViewport; }
-
-
-private:
-    uint32_t mWidth = 0;
-    uint32_t mHeight = 0;
-    RenderRegion mViewport{};
-    GLuint mFbo = 0;
-    GLuint mColorBuffer = 0;
-    GLuint mDepthStencilBuffer = 0;
-    GLuint mResolveFbo = 0;
-    GLuint mColorTex = 0;
+    void initialize(GlContext& context, uint32_t width, uint32_t height);
+    void release(GlContext& context);
+    void resolve(GlContext& context);
 };
 
 class GlRenderTargetPool {
-public:
-    GlRenderTargetPool(uint32_t maxWidth, uint32_t maxHeight);
-    ~GlRenderTargetPool();
-
-    GlRenderTarget* getRenderTarget(const RenderRegion& vp, GLuint resolveId = 0);
 private:
-    uint32_t mMaxWidth = 0;
-    uint32_t mMaxHeight = 0;
-    Array<GlRenderTarget*> mPool;
-};
+    Array<GlRenderTarget*> list;
+    Array<GlRenderTarget*> pool;
+    uint32_t width{};
+    uint32_t height{};
+public:
+    GlRenderTarget* allocate(GlContext& context);
+    void free(GlContext& context, GlRenderTarget* renderTarget);
 
-#endif //_TVG_GL_RENDER_RENDER_TARGET_H_
+    void initialize(GlContext& context, uint32_t width, uint32_t height);
+    void release(GlContext& context);
+};
+ 
+ #endif // _TVG_GL_RENDER_TARGET_H_
+ 
