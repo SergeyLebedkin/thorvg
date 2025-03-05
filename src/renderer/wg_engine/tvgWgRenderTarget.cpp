@@ -22,12 +22,12 @@
 
 #include "tvgWgRenderTarget.h"
 
-void WgRenderStorage::initialize(WgContext& context, uint32_t width, uint32_t height)
+void WgRenderTarget::initialize(WgContext& context, uint32_t width, uint32_t height)
 {
     this->width = width;
     this->height = height;
-    texture = context.createTexStorage(width, height, WGPUTextureFormat_RGBA8Unorm);
-    textureMS = context.createTexAttachement(width, height, WGPUTextureFormat_RGBA8Unorm, 4);
+    texture = context.createTexStorage(width, height, context.preferredFormat);
+    textureMS = context.createTexAttachement(width, height, context.preferredFormat, 4);
     texView = context.createTextureView(texture);
     texViewMS = context.createTextureView(textureMS);
     bindGroupRead = context.layouts.createBindGroupStrorage1RO(texView);
@@ -36,7 +36,7 @@ void WgRenderStorage::initialize(WgContext& context, uint32_t width, uint32_t he
 }
 
 
-void WgRenderStorage::release(WgContext& context)
+void WgRenderTarget::release(WgContext& context)
 {
     context.layouts.releaseBindGroup(bindGroupTexure);
     context.layouts.releaseBindGroup(bindGroupWrite);
@@ -53,35 +53,35 @@ void WgRenderStorage::release(WgContext& context)
 // render storage pool
 //*****************************************************************************
 
-WgRenderStorage* WgRenderStoragePool::allocate(WgContext& context)
+WgRenderTarget* WgRenderTargetPool::allocate(WgContext& context)
 {
-    WgRenderStorage* renderStorage{};
+    WgRenderTarget* renderTarget{};
     if (pool.count > 0) {
-        renderStorage = pool.last();
+        renderTarget = pool.last();
         pool.pop();
     } else {
-        renderStorage = new WgRenderStorage;
-        renderStorage->initialize(context, width, height);
-        list.push(renderStorage);
+        renderTarget = new WgRenderTarget;
+        renderTarget->initialize(context, width, height);
+        list.push(renderTarget);
     }
-    return renderStorage;
+    return renderTarget;
 };
 
 
-void WgRenderStoragePool::free(WgContext& context, WgRenderStorage* renderStorage)
+void WgRenderTargetPool::free(WgContext& context, WgRenderTarget* renderTarget)
 {
-    pool.push(renderStorage);
+    pool.push(renderTarget);
 };
 
 
-void WgRenderStoragePool::initialize(WgContext& context, uint32_t width, uint32_t height)
+void WgRenderTargetPool::initialize(WgContext& context, uint32_t width, uint32_t height)
 {
     this->width = width;
     this->height = height;
 }
 
 
-void WgRenderStoragePool::release(WgContext& context)
+void WgRenderTargetPool::release(WgContext& context)
 {
     ARRAY_FOREACH(p, list) {
        (*p)->release(context);

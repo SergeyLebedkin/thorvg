@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2025 the ThorVG project. All rights reserved.
+ * Copyright (c) 2023 - 2025 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,25 +20,52 @@
  * SOFTWARE.
  */
 
-#ifndef _TVG_GL_SHADER_H_
-#define _TVG_GL_SHADER_H_
-
+#ifndef _TVG_GL_SHADERS_H_
+#define _TVG_GL_SHADERS_H_
+ 
 #include "tvgGlCommon.h"
 
-class GlShader
+// uniform locations
+struct GlUniformLocations
 {
-public:
-    GlShader(const char* vertSrc, const char* fragSrc);
-    ~GlShader();
-
-    uint32_t getVertexShader();
-    uint32_t getFragmentShader();
-
-private:
-    uint32_t compileShader(uint32_t type, char* shaderSrc);
-
-    uint32_t mVtShader;
-    uint32_t mFrShader;
+    // uniforms
+    GLint uViewMat{};
+    GLint uModelMat{};
+    GLint uColorDebug{};
+    // textures
+    GLint uImageSrc{};
 };
 
-#endif /* _TVG_GL_SHADER_H_ */
+struct GlProgram
+{
+    GLuint prog{};
+    GlUniformLocations uloc{};
+
+    void initialize(GlContext& context, GLuint vertexShader, GLuint fragmentShader);
+    void release(GlContext& context);
+    bool checkStatus();
+    void updateUniformLocations();
+};
+ 
+class GlShaders
+{
+private:
+    // shaders
+    GLuint vs_debug{};
+    GLuint fs_debug{};
+    GLuint vs_blit{};
+    GLuint fs_blit{};
+public:
+    // programs
+    GlProgram debug{};
+    GlProgram blit{};
+private:
+    GLuint createShader(GLenum type, const char* source);
+    void releaseShader(GLuint& shader);
+public:
+    void initialize(GlContext& context);
+    void release(GlContext& context);
+};
+ 
+ #endif // _TVG_GL_SHADERS_H_
+ 

@@ -23,7 +23,8 @@
 #ifndef _TVG_WG_RENDERER_H_
 #define _TVG_WG_RENDERER_H_
 
-#include "tvgWgCompositor.h"
+#include "tvgWgRenderTask.h"
+#include "tvgRender.h"
 
 class WgRenderer : public RenderMethod
 {
@@ -44,10 +45,9 @@ public:
     ColorSpace colorSpace() override;
     const RenderSurface* mainSurface() override;
 
+    bool target(WGPUDevice device, WGPUInstance instance, void* target, uint32_t width, uint32_t height, int type = 0);
     bool clear() override;
     bool sync() override;
-
-    bool target(WGPUDevice device, WGPUInstance instance, void* target, uint32_t width, uint32_t height, int type = 0);
 
     RenderCompositor* target(const RenderRegion& region, ColorSpace cs, CompositionFlag flags) override;
     bool beginComposite(RenderCompositor* cmp, MaskMethod method, uint8_t opacity) override;
@@ -74,19 +74,19 @@ private:
     bool surfaceConfigure(WGPUSurface surface, WgContext& context, uint32_t width, uint32_t height);
 
     // render tree stacks
-    WgRenderStorage mRenderStorageRoot;
-    Array<WgCompose*> mCompositorStack;
-    Array<WgRenderStorage*> mRenderStorageStack;
-    Array<WgRenderDataViewport*> mRenderDataViewportList;
+    WgRenderTarget mRenderTargetRoot;
+    Array<WgCompose*> mCompositorList;
+    Array<WgRenderTarget*> mRenderTargetStack;
+    Array<WgSceneTask*> mSceneTaskStack;
+    Array<WgRenderTask*> mRenderTaskList;
 
     // render storage pool
-    WgRenderStoragePool mRenderStoragePool;
+    WgRenderTargetPool mRenderTargetPool;
 
     // render data paint pools
+    WgRenderDataStagedBuffer mRenderDataStagedBuffer;
     WgRenderDataShapePool mRenderDataShapePool;
     WgRenderDataPicturePool mRenderDataPicturePool;
-    WgRenderDataViewportPool mRenderDataViewportPool;
-    WgRenderDataEffectParamsPool mRenderDataEffectParamsPool;
 
     // rendering context
     WgContext mContext;
@@ -102,7 +102,6 @@ private:
     Key mDisposeKey{};
 
     // gpu handles
-    WGPUCommandEncoder mCommandEncoder{};
     WGPUTexture targetTexture{}; // external handle
     WGPUSurfaceTexture surfaceTexture{};
     WGPUSurface surface{};  // external handle

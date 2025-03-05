@@ -20,8 +20,8 @@
  * SOFTWARE.
  */
 
-#ifndef _TVG_WG_GEOMETRY_H_
-#define _TVG_WG_GEOMETRY_H_
+#ifndef _TVG_GL_GEOMETRY_H_
+#define _TVG_GL_GEOMETRY_H_
 
 #include <cassert>
 #include "tvgMath.h"
@@ -29,31 +29,31 @@
 
 
 // default size of vertex and index buffers
-#define WG_DEFAULT_BUFFER_SIZE 2048
+#define GL_DEFAULT_BUFFER_SIZE 2048
 
-struct WgVertexBuffer;
-struct WgIndexedVertexBuffer;
+struct GlVertexBuffer;
+struct GlIndexedVertexBuffer;
 
-struct WgGeometryBufferPool
+struct GlGeometryBufferPool
 {
 private:
-    Array<WgVertexBuffer*> vbuffers;
-    Array<WgIndexedVertexBuffer*> ibuffers;
+    Array<GlVertexBuffer*> vbuffers;
+    Array<GlIndexedVertexBuffer*> ibuffers;
 
 public:
-    ~WgGeometryBufferPool();
+    ~GlGeometryBufferPool();
 
-    WgVertexBuffer* reqVertexBuffer(float scale = 1.0f);
-    WgIndexedVertexBuffer* reqIndexedVertexBuffer(float scale = 1.0f);
-    void retVertexBuffer(WgVertexBuffer* buffer);
-    void retIndexedVertexBuffer(WgIndexedVertexBuffer* buffer);
+    GlVertexBuffer* reqVertexBuffer(float scale = 1.0f);
+    GlIndexedVertexBuffer* reqIndexedVertexBuffer(float scale = 1.0f);
+    void retVertexBuffer(GlVertexBuffer* buffer);
+    void retIndexedVertexBuffer(GlIndexedVertexBuffer* buffer);
 
-    static WgGeometryBufferPool* instance();  //return the shared buffer pool
+    static GlGeometryBufferPool* instance();  //return the shared buffer pool
 };
 
 
 // simple vertex buffer
-struct WgVertexBuffer
+struct GlVertexBuffer
 {
     Point* data;           // vertex buffer
     struct Distance {
@@ -61,20 +61,20 @@ struct WgVertexBuffer
         float length;      // distance to the first point through all previous points
     } *dist;
     uint32_t count = 0;
-    uint32_t reserved = WG_DEFAULT_BUFFER_SIZE;
+    uint32_t reserved = GL_DEFAULT_BUFFER_SIZE;
     float scale;           // tesselation scale
     bool closed = false;
 
     // callback for external process of polyline
-    using onPolylineFn = std::function<void(const WgVertexBuffer& buff)>;
+    using onPolylineFn = std::function<void(const GlVertexBuffer& buff)>;
 
-    WgVertexBuffer(float scale = 1.0f) : scale(scale)
+    GlVertexBuffer(float scale = 1.0f) : scale(scale)
     {
         data = tvg::malloc<Point*>(sizeof(Point) * reserved);
         dist = tvg::malloc<Distance*>(sizeof(Distance) * reserved);
     }
 
-    ~WgVertexBuffer()
+    ~GlVertexBuffer()
     {
         tvg::free(data);
         tvg::free(dist);
@@ -166,7 +166,7 @@ struct WgVertexBuffer
     }
 
     // append source vertex buffer in index range from start to end (end not included)
-    void appendRange(const WgVertexBuffer& buff, size_t start_index, size_t end_index)
+    void appendRange(const GlVertexBuffer& buff, size_t start_index, size_t end_index)
     {
         for (size_t i = start_index; i < end_index; i++) {
             append(buff.data[i]);
@@ -273,25 +273,25 @@ struct WgVertexBuffer
 };
 
 
-struct WgIndexedVertexBuffer
+struct GlIndexedVertexBuffer
 {
     Point* vbuff;
     uint32_t* ibuff;
     uint32_t vcount = 0, icount = 0;
-    size_t vreserved = WG_DEFAULT_BUFFER_SIZE;
-    size_t ireserved = WG_DEFAULT_BUFFER_SIZE * 2;
-    WgGeometryBufferPool* pool;
-    WgVertexBuffer* dashed;   // intermediate buffer for stroke dashing
+    size_t vreserved = GL_DEFAULT_BUFFER_SIZE;
+    size_t ireserved = GL_DEFAULT_BUFFER_SIZE * 2;
+    GlGeometryBufferPool* pool;
+    GlVertexBuffer* dashed;   // intermediate buffer for stroke dashing
     float scale;
 
-    WgIndexedVertexBuffer(WgGeometryBufferPool* pool, float scale = 1.0f) : pool(pool), scale(scale)
+    GlIndexedVertexBuffer(GlGeometryBufferPool* pool, float scale = 1.0f) : pool(pool), scale(scale)
     {
         vbuff = tvg::malloc<Point*>(sizeof(Point) * vreserved);
         ibuff = tvg::malloc<uint32_t*>(sizeof(uint32_t) * ireserved);
         dashed = pool->reqVertexBuffer();
     }
 
-    ~WgIndexedVertexBuffer()
+    ~GlIndexedVertexBuffer()
     {
         pool->retVertexBuffer(dashed);
         tvg::free(vbuff);
@@ -354,7 +354,7 @@ struct WgIndexedVertexBuffer
     }
     
     // dash buffer by pattern
-    void appendStrokesDashed(const WgVertexBuffer& buff, const RenderStroke* rstroke)
+    void appendStrokesDashed(const GlVertexBuffer& buff, const RenderStroke* rstroke)
     {
         // dashed buffer
         dashed->reset(scale);
@@ -414,7 +414,7 @@ struct WgIndexedVertexBuffer
     }
 
     // append buffer with optional offset
-    void appendBuffer(const WgVertexBuffer& buff, Point offset = Point{0.0f, 0.0f})
+    void appendBuffer(const GlVertexBuffer& buff, Point offset = Point{0.0f, 0.0f})
     {
         growVertex(buff.count);
         growIndex(buff.count);
@@ -478,7 +478,7 @@ struct WgIndexedVertexBuffer
         appendQuad(v1 - nrm, v1 + nrm, v1 + offset - nrm, v1 + offset + nrm);
     }
 
-    void appendStrokes(const WgVertexBuffer& buff, const RenderStroke* rstroke)
+    void appendStrokes(const GlVertexBuffer& buff, const RenderStroke* rstroke)
     {
         assert(rstroke);
         // empty buffer gueard
@@ -500,7 +500,7 @@ struct WgIndexedVertexBuffer
         // append round joints and caps
         if ((rstroke->join == StrokeJoin::Round) || (rstroke->cap == StrokeCap::Round)) {
             // create mesh for circle
-            WgVertexBuffer circle;
+            GlVertexBuffer circle;
             circle.reset(buff.scale);
             circle.appendCircle(halfWidth);
             // append caps (round)
@@ -543,4 +543,4 @@ struct WgIndexedVertexBuffer
     }
 };
 
-#endif // _TVG_WG_GEOMETRY_H_
+#endif // _TVG_GL_GEOMETRY_H_

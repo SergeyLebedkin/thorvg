@@ -35,7 +35,7 @@ void WgContext::initialize(WGPUInstance instance, WGPUDevice device)
     // store global instance and surface
     this->instance = instance;
     this->device = device;
-    this->preferredFormat = WGPUTextureFormat_BGRA8Unorm;
+    this->preferredFormat = WGPUTextureFormat_RGBA8Unorm;
 
     // get current queue
     queue = wgpuDeviceGetQueue(device);
@@ -270,5 +270,30 @@ void WgContext::releaseQueue(WGPUQueue& queue)
     if (queue) {
         wgpuQueueRelease(queue);
         queue = nullptr;
+    }
+}
+
+
+WGPUCommandEncoder WgContext::createCommandEncoder()
+{
+    WGPUCommandEncoderDescriptor commandEncoderDesc{};
+    return wgpuDeviceCreateCommandEncoder(device, &commandEncoderDesc);
+}
+
+
+void WgContext::submitCommandEncoder(WGPUCommandEncoder commandEncoder)
+{
+    const WGPUCommandBufferDescriptor commandBufferDesc{};
+    WGPUCommandBuffer commandsBuffer = wgpuCommandEncoderFinish(commandEncoder, &commandBufferDesc);
+    wgpuQueueSubmit(queue, 1, &commandsBuffer);
+    wgpuCommandBufferRelease(commandsBuffer);
+}
+
+
+void WgContext::releaseCommandEncoder(WGPUCommandEncoder& commandEncoder)
+{
+    if (commandEncoder) {
+        wgpuCommandEncoderRelease(commandEncoder);
+        commandEncoder = nullptr;
     }
 }
