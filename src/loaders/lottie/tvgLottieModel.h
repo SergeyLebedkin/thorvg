@@ -57,7 +57,9 @@ struct LottieStroke
         if (dashattr->size + 1 > dashattr->allocated) {
             dashattr->allocated = dashattr->size + 2;
             auto newValues = new LottieFloat[dashattr->allocated];
-            for (uint8_t i = 0; i < dashattr->size; ++i) newValues[i] = LottieFloat(dashattr->values[i]);
+            for (uint8_t i = 0; i < dashattr->size; ++i) {
+                newValues[i].copy(dashattr->values[i]);
+            }
             delete[] dashattr->values;
             dashattr->values = newValues;
         }
@@ -919,7 +921,7 @@ struct LottieSlot
     void assign(LottieObject* target, bool byDefault);
     void reset();
 
-    LottieSlot(char* sid, LottieObject* obj, LottieProperty::Type type) : sid(sid), type(type)
+    LottieSlot(LottieLayer* layer, LottieObject* parent, char* sid, LottieObject* obj, LottieProperty::Type type) : context{layer, parent}, sid(sid), type(type)
     {
         pairs.push({obj});
     }
@@ -931,9 +933,15 @@ struct LottieSlot
         ARRAY_FOREACH(pair, pairs) delete(pair->prop);
     }
 
+    struct {
+        LottieLayer* layer;
+        LottieObject* parent;
+    } context;
+
     char* sid;
     Array<Pair> pairs;
     LottieProperty::Type type;
+
     bool overridden = false;
 };
 
