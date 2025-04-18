@@ -138,8 +138,13 @@ void WgCompositor::copyTexture(const WgRenderStorage* dst, const WgRenderStorage
     assert(dst);
     assert(src);
     assert(commandEncoder);
+    #ifndef __EMSCRIPTEN__
+    const WGPUTexelCopyTextureInfo texSrc { .texture = src->texture, .origin = { .x = (uint32_t)region.x, .y = (uint32_t)region.y } };
+    const WGPUTexelCopyTextureInfo texDst { .texture = dst->texture, .origin = { .x = (uint32_t)region.x, .y = (uint32_t)region.y } };
+    #else
     const WGPUImageCopyTexture texSrc { .texture = src->texture, .origin = { .x = (uint32_t)region.x, .y = (uint32_t)region.y } };
     const WGPUImageCopyTexture texDst { .texture = dst->texture, .origin = { .x = (uint32_t)region.x, .y = (uint32_t)region.y } };
+    #endif
     const WGPUExtent3D copySize { .width = (uint32_t)region.w, .height = (uint32_t)region.h, .depthOrArrayLayers = 1 };
     wgpuCommandEncoderCopyTextureToTexture(commandEncoder, &texSrc, &texDst, &copySize);
 }

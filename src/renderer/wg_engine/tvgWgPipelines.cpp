@@ -27,11 +27,23 @@
 
 WGPUShaderModule WgPipelines::createShaderModule(WGPUDevice device, const char* label, const char* code)
 {
+    #ifndef __EMSCRIPTEN__
+    const WGPUShaderSourceWGSL shaderSourceWGSL {
+        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
+        .code = { .data = code, .length = WGPU_STRLEN }
+    };
+    const WGPUShaderModuleDescriptor shaderModuleDesc {
+        .nextInChain = &shaderSourceWGSL.chain,
+        .label = { .data = label, .length = WGPU_STRLEN }
+    };
+    return wgpuDeviceCreateShaderModule(device, &shaderModuleDesc);
+    #else
     WGPUShaderModuleWGSLDescriptor shaderModuleWGSLDesc{};
     shaderModuleWGSLDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
     shaderModuleWGSLDesc.code = code;
     const WGPUShaderModuleDescriptor shaderModuleDesc { .nextInChain = &shaderModuleWGSLDesc.chain, .label = label };
     return wgpuDeviceCreateShaderModule(device, &shaderModuleDesc);
+    #endif
 }
 
 
@@ -47,14 +59,24 @@ WGPURenderPipeline WgPipelines::createRenderPipeline(
     const WGPUShaderModule shaderModule, const char* vsEntryPoint, const char* fsEntryPoint,
     const WGPUPipelineLayout pipelineLayout,
     const WGPUVertexBufferLayout *vertexBufferLayouts, const uint32_t vertexBufferLayoutsCount,
-    const WGPUColorWriteMaskFlags writeMask, const WGPUTextureFormat colorTargetFormat, const WGPUBlendState blendState,
+    #ifndef __EMSCRIPTEN__
+    const WGPUColorWriteMask writeMask,
+    #else
+    const WGPUColorWriteMaskFlags writeMask,
+    #endif
+    const WGPUTextureFormat colorTargetFormat, const WGPUBlendState blendState,
     const WGPUDepthStencilState depthStencilState, const WGPUMultisampleState multisampleState)
 {
     const WGPUColorTargetState colorTargetState { .format = colorTargetFormat, .blend = &blendState, .writeMask = writeMask };
     const WGPUColorTargetState colorTargetStates[] { colorTargetState };
     const WGPUPrimitiveState primitiveState { .topology = WGPUPrimitiveTopology_TriangleList };
+    #ifndef __EMSCRIPTEN__
+    const WGPUVertexState   vertexState   { .module = shaderModule, .entryPoint = { .data = vsEntryPoint, .length = WGPU_STRLEN }, .bufferCount = vertexBufferLayoutsCount, .buffers = vertexBufferLayouts };
+    const WGPUFragmentState fragmentState { .module = shaderModule, .entryPoint = { .data = fsEntryPoint, .length = WGPU_STRLEN }, .targetCount = 1, .targets = colorTargetStates };
+    #else
     const WGPUVertexState   vertexState   { .module = shaderModule, .entryPoint = vsEntryPoint, .bufferCount = vertexBufferLayoutsCount, .buffers = vertexBufferLayouts };
     const WGPUFragmentState fragmentState { .module = shaderModule, .entryPoint = fsEntryPoint, .targetCount = 1, .targets = colorTargetStates };
+    #endif
     const WGPURenderPipelineDescriptor renderPipelineDesc {
         .label = pipelineLabel,
         .layout = pipelineLayout,
@@ -78,7 +100,7 @@ WGPUComputePipeline WgPipelines::createComputePipeline(
         .layout = pipelineLayout,
         .compute = { 
             .module = shaderModule,
-            .entryPoint = entryPoint
+            .entryPoint = { .data = entryPoint, .length = WGPU_STRLEN }
         }
     };
     return wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
@@ -122,7 +144,12 @@ void WgPipelines::releaseShaderModule(WGPUShaderModule& shaderModule)
 
 
 WGPUDepthStencilState WgPipelines::makeDepthStencilState(
-    const WGPUCompareFunction depthCompare, WGPUBool depthWriteEnabled,
+    const WGPUCompareFunction depthCompare,
+    #ifndef __EMSCRIPTEN__
+    WGPUOptionalBool depthWriteEnabled,
+    #else
+    WGPUBool depthWriteEnabled,
+    #endif
     const WGPUCompareFunction stencilFunction, const WGPUStencilOperation stencilOperation)
 {
     return makeDepthStencilState(depthCompare, depthWriteEnabled, stencilFunction, stencilOperation, stencilFunction, stencilOperation);
@@ -130,7 +157,12 @@ WGPUDepthStencilState WgPipelines::makeDepthStencilState(
 
 
 WGPUDepthStencilState WgPipelines::makeDepthStencilState(
-    const WGPUCompareFunction depthCompare, WGPUBool depthWriteEnabled,
+    const WGPUCompareFunction depthCompare,
+    #ifndef __EMSCRIPTEN__
+    WGPUOptionalBool depthWriteEnabled,
+    #else
+    WGPUBool depthWriteEnabled,
+    #endif
     const WGPUCompareFunction stencilFunctionFrnt, const WGPUStencilOperation stencilOperationFrnt,
     const WGPUCompareFunction stencilFunctionBack, const WGPUStencilOperation stencilOperationBack)
 {
@@ -151,8 +183,13 @@ void WgPipelines::initialize(WgContext& context)
     const WGPUVertexAttribute vertexAttributeTex { .format = WGPUVertexFormat_Float32x2, .offset = 0, .shaderLocation = 1 };
     const WGPUVertexAttribute vertexAttributesPos[] { vertexAttributePos };
     const WGPUVertexAttribute vertexAttributesTex[] { vertexAttributeTex };
+    #ifndef __EMSCRIPTEN__
+    const WGPUVertexBufferLayout vertexBufferLayoutPos { .stepMode = WGPUVertexStepMode_Vertex, .arrayStride = 8, .attributeCount = 1, .attributes = vertexAttributesPos };
+    const WGPUVertexBufferLayout vertexBufferLayoutTex { .stepMode = WGPUVertexStepMode_Vertex, .arrayStride = 8, .attributeCount = 1, .attributes = vertexAttributesTex };
+    #else
     const WGPUVertexBufferLayout vertexBufferLayoutPos { .arrayStride = 8, .stepMode = WGPUVertexStepMode_Vertex, .attributeCount = 1, .attributes = vertexAttributesPos };
     const WGPUVertexBufferLayout vertexBufferLayoutTex { .arrayStride = 8, .stepMode = WGPUVertexStepMode_Vertex, .attributeCount = 1, .attributes = vertexAttributesTex };
+    #endif
     const WGPUVertexBufferLayout vertexBufferLayoutsShape[] { vertexBufferLayoutPos };
     const WGPUVertexBufferLayout vertexBufferLayoutsImage[] { vertexBufferLayoutPos, vertexBufferLayoutTex };
     const WGPUMultisampleState multisampleState   { .count = 4, .mask = 0xFFFFFFFF, .alphaToCoverageEnabled = false };
@@ -187,6 +224,21 @@ void WgPipelines::initialize(WgContext& context)
     const WGPUBindGroupLayout bindGroupLayoutsGauss[] { layouts.layoutTexStrorage1RO, layouts.layoutTexStrorage1WO, layouts.layoutBuffer1Un, layouts.layoutBuffer1Un };
     const WGPUBindGroupLayout bindGroupLayoutsEffects[] { layouts.layoutTexStrorage2RO, layouts.layoutTexStrorage1WO, layouts.layoutBuffer1Un, layouts.layoutBuffer1Un };
 
+    #ifndef __EMSCRIPTEN__
+    // depth stencil state markup
+    const WGPUDepthStencilState depthStencilStateNonZero = makeDepthStencilState(WGPUCompareFunction_Always, WGPUOptionalBool_False, WGPUCompareFunction_Always, WGPUStencilOperation_IncrementWrap, WGPUCompareFunction_Always, WGPUStencilOperation_DecrementWrap);
+    const WGPUDepthStencilState depthStencilStateEvenOdd = makeDepthStencilState(WGPUCompareFunction_Always, WGPUOptionalBool_False, WGPUCompareFunction_Always, WGPUStencilOperation_Invert);
+    const WGPUDepthStencilState depthStencilStateDirect  = makeDepthStencilState(WGPUCompareFunction_Always, WGPUOptionalBool_False, WGPUCompareFunction_Always, WGPUStencilOperation_Replace);
+    // depth stencil state clip path
+    const WGPUDepthStencilState depthStencilStateCopyStencilToDepth    = makeDepthStencilState(WGPUCompareFunction_Always,  WGPUOptionalBool_True,  WGPUCompareFunction_NotEqual, WGPUStencilOperation_Zero);
+    const WGPUDepthStencilState depthStencilStateCopyStencilToDepthInt = makeDepthStencilState(WGPUCompareFunction_Greater, WGPUOptionalBool_True,  WGPUCompareFunction_NotEqual, WGPUStencilOperation_Zero);
+    const WGPUDepthStencilState depthStencilStateCopyDepthToStencil    = makeDepthStencilState(WGPUCompareFunction_Equal,   WGPUOptionalBool_False, WGPUCompareFunction_Always,   WGPUStencilOperation_Replace);
+    const WGPUDepthStencilState depthStencilStateMergeDepthStencil     = makeDepthStencilState(WGPUCompareFunction_Equal,   WGPUOptionalBool_True,  WGPUCompareFunction_Always,   WGPUStencilOperation_Keep);
+    const WGPUDepthStencilState depthStencilStateClearDepth            = makeDepthStencilState(WGPUCompareFunction_Always,  WGPUOptionalBool_True,  WGPUCompareFunction_Always,   WGPUStencilOperation_Keep);
+    // depth stencil state blend, compose and blit
+    const WGPUDepthStencilState depthStencilStateShape = makeDepthStencilState(WGPUCompareFunction_Always, WGPUOptionalBool_False,  WGPUCompareFunction_NotEqual, WGPUStencilOperation_Zero);
+    const WGPUDepthStencilState depthStencilStateScene = makeDepthStencilState(WGPUCompareFunction_Always, WGPUOptionalBool_False,  WGPUCompareFunction_Always, WGPUStencilOperation_Zero);
+    #else
     // depth stencil state markup
     const WGPUDepthStencilState depthStencilStateNonZero = makeDepthStencilState(WGPUCompareFunction_Always, false, WGPUCompareFunction_Always, WGPUStencilOperation_IncrementWrap, WGPUCompareFunction_Always, WGPUStencilOperation_DecrementWrap);
     const WGPUDepthStencilState depthStencilStateEvenOdd = makeDepthStencilState(WGPUCompareFunction_Always, false, WGPUCompareFunction_Always, WGPUStencilOperation_Invert);
@@ -200,6 +252,7 @@ void WgPipelines::initialize(WgContext& context)
     // depth stencil state blend, compose and blit
     const WGPUDepthStencilState depthStencilStateShape = makeDepthStencilState(WGPUCompareFunction_Always, false,  WGPUCompareFunction_NotEqual, WGPUStencilOperation_Zero);
     const WGPUDepthStencilState depthStencilStateScene = makeDepthStencilState(WGPUCompareFunction_Always, false,  WGPUCompareFunction_Always, WGPUStencilOperation_Zero);
+    #endif
 
     // shaders
     char shaderSourceBuff[16384]{};

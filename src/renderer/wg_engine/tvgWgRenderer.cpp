@@ -125,9 +125,7 @@ bool WgRenderer::surfaceConfigure(WGPUSurface surface, WgContext& context, uint3
     #endif
         .width = width,
         .height = height,
-    #ifndef __EMSCRIPTEN__
         .presentMode = WGPUPresentMode_Fifo,
-    #endif
     };
     wgpuSurfaceConfigure(surface, &surfaceConfiguration);
     return true;

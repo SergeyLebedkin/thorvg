@@ -113,7 +113,12 @@ private:
         const WGPUShaderModule shaderModule, const char* vsEntryPoint, const char* fsEntryPoint,
         const WGPUPipelineLayout pipelineLayout,
         const WGPUVertexBufferLayout *vertexBufferLayouts, const uint32_t vertexBufferLayoutsCount,
-        const WGPUColorWriteMaskFlags writeMask, const WGPUTextureFormat colorTargetFormat, const WGPUBlendState blendState,
+        #ifndef __EMSCRIPTEN__
+        const WGPUColorWriteMask writeMask,
+        #else
+        const WGPUColorWriteMaskFlags writeMask,
+        #endif
+        const WGPUTextureFormat colorTargetFormat, const WGPUBlendState blendState,
         const WGPUDepthStencilState depthStencilState, const WGPUMultisampleState multisampleState);
     WGPUComputePipeline createComputePipeline(
         WGPUDevice device, const char* pipelineLabel,
@@ -125,10 +130,20 @@ private:
     void releaseShaderModule(WGPUShaderModule& shaderModule);
 
     WGPUDepthStencilState makeDepthStencilState(
-        const WGPUCompareFunction depthCompare, WGPUBool depthWriteEnabled,
+        const WGPUCompareFunction depthCompare,
+        #ifndef __EMSCRIPTEN__
+        WGPUOptionalBool depthWriteEnabled,
+        #else
+        WGPUBool depthWriteEnabled,
+        #endif
         const WGPUCompareFunction stencilFunctionFrnt, const WGPUStencilOperation stencilOperationFrnt);
     WGPUDepthStencilState makeDepthStencilState(
-        const WGPUCompareFunction depthCompare, WGPUBool depthWriteEnabled,
+        const WGPUCompareFunction depthCompare, 
+        #ifndef __EMSCRIPTEN__
+        WGPUOptionalBool depthWriteEnabled,
+        #else
+        WGPUBool depthWriteEnabled,
+        #endif
         const WGPUCompareFunction stencilFunctionFrnt, const WGPUStencilOperation stencilOperationFrnt,
         const WGPUCompareFunction stencilFunctionBack, const WGPUStencilOperation stencilOperationBack);
 public:
