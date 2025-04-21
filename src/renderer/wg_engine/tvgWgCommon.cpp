@@ -81,19 +81,29 @@ bool WgContext::allocateTexture(WGPUTexture& texture, uint32_t width, uint32_t h
 {
     if ((texture) && (wgpuTextureGetWidth(texture) == width) && (wgpuTextureGetHeight(texture) == height)) {
         // update texture data
-        const WGPUImageCopyTexture imageCopyTexture{ .texture = texture };
-        const WGPUTextureDataLayout textureDataLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        #ifndef __EMSCRIPTEN__
+        const WGPUTexelCopyTextureInfo copyTextureInfo{ .texture = texture };
+        const WGPUTexelCopyBufferLayout copyBufferLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        #else
+        const WGPUImageCopyTexture copyTextureInfo{ .texture = texture };
+        const WGPUTextureDataLayout copyBufferLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        #endif
         const WGPUExtent3D writeSize{ .width = width, .height = height, .depthOrArrayLayers = 1 };
-        wgpuQueueWriteTexture(queue, &imageCopyTexture, data, 4 * width * height, &textureDataLayout, &writeSize);
+        wgpuQueueWriteTexture(queue, &copyTextureInfo, data, 4 * width * height, &copyBufferLayout, &writeSize);
         wgpuQueueSubmit(queue, 0, nullptr);
     } else {
         releaseTexture(texture);
         texture = createTexture(width, height, format);
         // update texture data
-        const WGPUImageCopyTexture imageCopyTexture{ .texture = texture };
-        const WGPUTextureDataLayout textureDataLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        #ifndef __EMSCRIPTEN__
+        const WGPUTexelCopyTextureInfo copyTextureInfo{ .texture = texture };
+        const WGPUTexelCopyBufferLayout copyBufferLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        #else
+        const WGPUImageCopyTexture copyTextureInfo{ .texture = texture };
+        const WGPUTextureDataLayout copyBufferLayout{ .bytesPerRow = 4 * width, .rowsPerImage = height };
+        #endif
         const WGPUExtent3D writeSize{ .width = width, .height = height, .depthOrArrayLayers = 1 };
-        wgpuQueueWriteTexture(queue, &imageCopyTexture, data, 4 * width * height, &textureDataLayout, &writeSize);
+        wgpuQueueWriteTexture(queue, &copyTextureInfo, data, 4 * width * height, &copyBufferLayout, &writeSize);
         wgpuQueueSubmit(queue, 0, nullptr);
         return true;
     }
